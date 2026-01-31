@@ -45,6 +45,7 @@ npm run db:reset       # Reset database
 - No HTML files - App.jsx is the entrypoint
 
 ### Database (Prisma + SQLite)
+Schema defined in `prisma/schema.prisma` - reference this file to understand data structure.
 - **User**: email, password (bcrypt hashed)
 - **Project**: name, messages (JSON string), data (serialized VirtualFileSystem)
 - Anonymous users can use the app; only authenticated users can persist projects
