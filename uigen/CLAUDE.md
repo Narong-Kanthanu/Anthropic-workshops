@@ -51,6 +51,10 @@ npm run db:reset       # Reset database
 - JWT sessions (7-day expiry) via `src/lib/auth.ts`
 - Server actions in `src/actions/` for sign-up/sign-in
 
+## Code Style
+
+- Use comments sparingly. Only comment complex code.
+
 ## Environment Variables
 
 - `ANTHROPIC_API_KEY` (optional): Enables real Claude responses; without it, mock mode returns static components
