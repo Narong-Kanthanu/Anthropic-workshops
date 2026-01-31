@@ -38,6 +38,8 @@ npm run db:reset       # Reset database
 - `str_replace_editor` (`src/lib/tools/str-replace.ts`): Create/edit files with str_replace commands
 - `file_manager` (`src/lib/tools/file-manager.ts`): File operations
 
+**ToolInvocationBadge** (`src/components/chat/ToolInvocationBadge.tsx`): Displays user-friendly messages for tool calls (e.g., "Creating /App.jsx" instead of "str_replace_editor"). Uses `getToolDisplayMessage()` helper for message generation.
+
 ### System Prompt Rules (`src/lib/prompts/generation.tsx`)
 - Every project must have `/App.jsx` as root
 - Use Tailwind CSS, not hardcoded styles
