@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Important**: Update this file whenever a solution is accepted to keep documentation current.
+
 ## Project Overview
 
 UIGen is an AI-powered React component generator with live preview. Users describe components in a chat interface, Claude generates them using tools, and the result renders in real-time. Components are stored in a virtual file system (no disk writes).
