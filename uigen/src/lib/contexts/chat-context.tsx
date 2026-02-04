@@ -1,23 +1,18 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  ReactNode,
-  useEffect,
-} from "react";
+import { createContext, useContext, ReactNode, useEffect, useState, useMemo } from "react";
 import { useChat as useAIChat } from "@ai-sdk/react";
-import { Message } from "ai";
+import { UIMessage, DefaultChatTransport } from "ai";
 import { useFileSystem } from "./file-system-context";
 import { setHasAnonWork } from "@/lib/anon-work-tracker";
 
 interface ChatContextProps {
   projectId?: string;
-  initialMessages?: Message[];
+  initialMessages?: UIMessage[];
 }
 
 interface ChatContextType {
-  messages: Message[];
+  messages: UIMessage[];
   input: string;
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
@@ -33,23 +28,45 @@ export function ChatProvider({
 }: ChatContextProps & { children: ReactNode }) {
   const { fileSystem, handleToolCall } = useFileSystem();
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    status,
-  } = useAIChat({
-    api: "/api/chat",
-    initialMessages,
-    body: {
-      files: fileSystem.serialize(),
-      projectId,
-    },
+  const [input, setInput] = useState("");
+
+  // Create transport with body included
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        body: {
+          files: fileSystem.serialize(),
+          projectId,
+        },
+      }),
+    [fileSystem, projectId]
+  );
+
+  const { messages, sendMessage, status } = useAIChat({
+    messages: initialMessages,
+
     onToolCall: ({ toolCall }) => {
-      handleToolCall(toolCall);
+      // Adapt the new toolCall format (uses 'input') to the old format (uses 'args')
+      handleToolCall({
+        toolName: toolCall.toolName,
+        args: (toolCall as any).input ?? (toolCall as any).args,
+      });
     },
+
+    transport,
   });
+
+  // Create handleSubmit wrapper that calls sendMessage
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (input.trim()) {
+      sendMessage({
+        parts: [{ type: "text", text: input }],
+      });
+      setInput("");
+    }
+  };
 
   // Track anonymous work
   useEffect(() => {
@@ -63,7 +80,7 @@ export function ChatProvider({
       value={{
         messages,
         input,
-        handleInputChange,
+        handleInputChange: (e) => setInput(e.target.value),
         handleSubmit,
         status,
       }}

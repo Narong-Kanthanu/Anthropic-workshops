@@ -10,9 +10,9 @@ beforeEach(() => {
   tool = buildStrReplaceTool(fs);
 });
 
-test("tool has correct id and parameters", () => {
+test("tool has correct id and inputSchema", () => {
   expect(tool.id).toBe("str_replace_editor");
-  expect(tool.parameters).toBeDefined();
+  expect(tool.inputSchema).toBeDefined();
 });
 
 // view command tests

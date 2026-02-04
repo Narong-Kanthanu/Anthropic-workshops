@@ -1,7 +1,7 @@
 import { test, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import { MessageList } from "../MessageList";
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 
 // Mock the MarkdownRenderer component
 vi.mock("../MarkdownRenderer", () => ({
@@ -24,11 +24,12 @@ test("MessageList shows empty state when no messages", () => {
 });
 
 test("MessageList renders user messages", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "user",
       content: "Create a button component",
+      parts: [{ type: "text", text: "Create a button component" }],
     },
   ];
 
@@ -38,11 +39,12 @@ test("MessageList renders user messages", () => {
 });
 
 test("MessageList renders assistant messages", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
       content: "I'll help you create a button component.",
+      parts: [{ type: "text", text: "I'll help you create a button component." }],
     },
   ];
 
@@ -54,7 +56,7 @@ test("MessageList renders assistant messages", () => {
 });
 
 test("MessageList renders messages with parts", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
@@ -62,15 +64,12 @@ test("MessageList renders messages with parts", () => {
       parts: [
         { type: "text", text: "Creating your component..." },
         {
-          type: "tool-invocation",
-          toolInvocation: {
-            toolCallId: "asdf",
-            args: {},
-            toolName: "str_replace_editor",
-            state: "result",
-            result: "Success",
-          },
-        },
+          type: "tool-str_replace_editor",
+          toolCallId: "asdf",
+          input: {},
+          state: "result",
+          output: "Success",
+        } as any,
       ],
     },
   ];
@@ -82,23 +81,25 @@ test("MessageList renders messages with parts", () => {
 });
 
 test("MessageList shows content for assistant message with content", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
       content: "Generating your component...",
+      parts: [{ type: "text", text: "Generating your component..." }],
     },
   ];
 
   render(<MessageList messages={messages} isLoading={true} />);
 
-  // The component shows the content but not a loading indicator when content is present
+  // The component shows the content and loading indicator when loading
   expect(screen.getByText("Generating your component...")).toBeDefined();
-  expect(screen.queryByText("Generating...")).toBeNull();
+  // Loading indicator appears when isLoading=true on last assistant message
+  expect(screen.getByText("Generating...")).toBeDefined();
 });
 
 test("MessageList shows loading state for last assistant message without content", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
@@ -112,16 +113,18 @@ test("MessageList shows loading state for last assistant message without content
 });
 
 test("MessageList doesn't show loading state for non-last messages", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
       content: "First response",
+      parts: [{ type: "text", text: "First response" }],
     },
     {
       id: "2",
       role: "user",
       content: "Another request",
+      parts: [{ type: "text", text: "Another request" }],
     },
   ];
 
@@ -132,7 +135,7 @@ test("MessageList doesn't show loading state for non-last messages", () => {
 });
 
 test("MessageList renders reasoning parts", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
@@ -141,9 +144,8 @@ test("MessageList renders reasoning parts", () => {
         { type: "text", text: "Let me analyze this." },
         {
           type: "reasoning",
-          reasoning: "The user wants a button component with specific styling.",
-          details: [],
-        },
+          text: "The user wants a button component with specific styling.",
+        } as any,
       ],
     },
   ];
@@ -157,26 +159,30 @@ test("MessageList renders reasoning parts", () => {
 });
 
 test("MessageList renders multiple messages in correct order", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "user",
       content: "First user message",
+      parts: [{ type: "text", text: "First user message" }],
     },
     {
       id: "2",
       role: "assistant",
       content: "First assistant response",
+      parts: [{ type: "text", text: "First assistant response" }],
     },
     {
       id: "3",
       role: "user",
       content: "Second user message",
+      parts: [{ type: "text", text: "Second user message" }],
     },
     {
       id: "4",
       role: "assistant",
       content: "Second assistant response",
+      parts: [{ type: "text", text: "Second assistant response" }],
     },
   ];
 
@@ -200,7 +206,7 @@ test("MessageList renders multiple messages in correct order", () => {
 });
 
 test("MessageList handles step-start parts", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
@@ -223,16 +229,18 @@ test("MessageList handles step-start parts", () => {
 });
 
 test("MessageList applies correct styling for user vs assistant messages", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "user",
       content: "User message",
+      parts: [{ type: "text", text: "User message" }],
     },
     {
       id: "2",
       role: "assistant",
       content: "Assistant message",
+      parts: [{ type: "text", text: "Assistant message" }],
     },
   ];
 
@@ -253,7 +261,7 @@ test("MessageList applies correct styling for user vs assistant messages", () =>
 });
 
 test("MessageList handles empty content with parts", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",
@@ -268,7 +276,7 @@ test("MessageList handles empty content with parts", () => {
 });
 
 test("MessageList shows loading for assistant message with empty parts", () => {
-  const messages: Message[] = [
+  const messages: UIMessage[] = [
     {
       id: "1",
       role: "assistant",

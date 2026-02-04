@@ -1,6 +1,6 @@
 import type { FileNode } from "@/lib/file-system";
 import { VirtualFileSystem } from "@/lib/file-system";
-import { streamText, appendResponseMessages } from "ai";
+import { streamText, generateId, stepCountIs } from "ai";
 import { buildStrReplaceTool } from "@/lib/tools/str-replace";
 import { buildFileManagerTool } from "@/lib/tools/file-manager";
 import { prisma } from "@/lib/prisma";
@@ -16,13 +16,18 @@ export async function POST(req: Request) {
   }: { messages: any[]; files: Record<string, FileNode>; projectId?: string } =
     await req.json();
 
-  messages.unshift({
-    role: "system",
-    content: generationPrompt,
-    providerOptions: {
-      anthropic: { cacheControl: { type: "ephemeral" } },
+  // Filter out system messages from client messages and add our system prompt
+  const clientMessages = messages.filter((m: any) => m.role !== "system");
+  const messagesWithSystem = [
+    {
+      role: "system",
+      content: generationPrompt,
+      providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
     },
-  });
+    ...clientMessages,
+  ];
 
   // Reconstruct the VirtualFileSystem from serialized data
   const fileSystem = new VirtualFileSystem();
@@ -33,9 +38,9 @@ export async function POST(req: Request) {
   const isMockProvider = !process.env.ANTHROPIC_API_KEY;
   const result = streamText({
     model,
-    messages,
-    maxTokens: 10_000,
-    maxSteps: isMockProvider ? 4 : 40,
+    messages: messagesWithSystem,
+    maxOutputTokens: 10_000,
+    stopWhen: stepCountIs(isMockProvider ? 4 : 40),
     onError: (err: any) => {
       console.error(err);
     },
@@ -43,24 +48,21 @@ export async function POST(req: Request) {
       str_replace_editor: buildStrReplaceTool(fileSystem),
       file_manager: buildFileManagerTool(fileSystem),
     },
-    onFinish: async ({ response }) => {
+  });
+
+  // Return the stream with message persistence in onFinish
+  return result.toUIMessageStreamResponse({
+    originalMessages: clientMessages,
+    generateMessageId: generateId,
+    onFinish: async ({ messages: allMessages }) => {
       // Save to project if projectId is provided and user is authenticated
       if (projectId) {
         try {
-          // Check if user is authenticated
           const session = await getSession();
           if (!session) {
             console.error("User not authenticated, cannot save project");
             return;
           }
-
-          // Get the messages from the response
-          const responseMessages = response.messages || [];
-          // Combine original messages with response messages
-          const allMessages = appendResponseMessages({
-            messages: [...messages.filter((m) => m.role !== "system")],
-            responseMessages,
-          });
 
           await prisma.project.update({
             where: {
@@ -78,8 +80,6 @@ export async function POST(req: Request) {
       }
     },
   });
-
-  return result.toDataStreamResponse();
 }
 
 export const maxDuration = 120;

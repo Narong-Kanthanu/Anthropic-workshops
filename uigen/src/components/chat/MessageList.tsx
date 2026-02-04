@@ -1,13 +1,13 @@
 "use client";
 
-import { Message } from "ai";
+import { UIMessage } from "ai";
 import { cn } from "@/lib/utils";
 import { User, Bot, Loader2 } from "lucide-react";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ToolInvocationBadge } from "./ToolInvocationBadge";
 
 interface MessageListProps {
-  messages: Message[];
+  messages: UIMessage[];
   isLoading?: boolean;
 }
 
@@ -24,12 +24,21 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
     );
   }
 
+  // Helper function to get text content from message parts
+  const getTextContent = (message: UIMessage): string => {
+    if (!message.parts) return "";
+    return message.parts
+      .filter((part): part is { type: "text"; text: string } => part.type === "text")
+      .map((part) => part.text)
+      .join("");
+  };
+
   return (
     <div className="flex flex-col h-full overflow-y-auto px-4 py-6">
       <div className="space-y-6 max-w-4xl mx-auto w-full">
         {messages.map((message) => (
           <div
-            key={message.id || message.content}
+            key={message.id || getTextContent(message)}
             className={cn(
               "flex gap-4",
               message.role === "user" ? "justify-end" : "justify-start"
@@ -42,19 +51,19 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                 </div>
               </div>
             )}
-            
+
             <div className={cn(
               "flex flex-col gap-2 max-w-[85%]",
               message.role === "user" ? "items-end" : "items-start"
             )}>
               <div className={cn(
                 "rounded-xl px-4 py-3",
-                message.role === "user" 
-                  ? "bg-blue-600 text-white shadow-sm" 
+                message.role === "user"
+                  ? "bg-blue-600 text-white shadow-sm"
                   : "bg-white text-neutral-900 border border-neutral-200 shadow-sm"
               )}>
                 <div className="text-sm">
-                  {message.parts ? (
+                  {message.parts && message.parts.length > 0 ? (
                     <>
                       {message.parts.map((part, partIndex) => {
                         switch (part.type) {
@@ -72,25 +81,41 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                             return (
                               <div key={partIndex} className="mt-3 p-3 bg-white/50 rounded-md border border-neutral-200">
                                 <span className="text-xs font-medium text-neutral-600 block mb-1">Reasoning</span>
-                                <span className="text-sm text-neutral-700">{part.reasoning}</span>
+                                <span className="text-sm text-neutral-700">{part.text}</span>
                               </div>
                             );
-                          case "tool-invocation":
-                            return (
-                              <ToolInvocationBadge
-                                key={partIndex}
-                                toolInvocation={part.toolInvocation}
-                              />
-                            );
-                          case "source":
+                          case "source-url":
+                          case "source-document":
                             return (
                               <div key={partIndex} className="mt-2 text-xs text-neutral-500">
-                                Source: {JSON.stringify(part.source)}
+                                Source: {JSON.stringify(part)}
                               </div>
                             );
                           case "step-start":
                             return partIndex > 0 ? <hr key={partIndex} className="my-3 border-neutral-200" /> : null;
                           default:
+                            // Handle tool invocation parts (they have type like "tool-str_replace_editor")
+                            if (part.type.startsWith("tool-")) {
+                              const toolPart = part as {
+                                type: string;
+                                toolCallId: string;
+                                state: string;
+                                input?: unknown;
+                                output?: unknown;
+                              };
+                              const toolName = part.type.replace("tool-", "");
+                              return (
+                                <ToolInvocationBadge
+                                  key={partIndex}
+                                  toolInvocation={{
+                                    toolName,
+                                    args: toolPart.input,
+                                    state: toolPart.state,
+                                    result: toolPart.output,
+                                  }}
+                                />
+                              );
+                            }
                             return null;
                         }
                       })}
@@ -103,12 +128,6 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                           </div>
                         )}
                     </>
-                  ) : message.content ? (
-                    message.role === "user" ? (
-                      <span className="whitespace-pre-wrap">{message.content}</span>
-                    ) : (
-                      <MarkdownRenderer content={message.content} className="prose-sm" />
-                    )
                   ) : isLoading &&
                     message.role === "assistant" &&
                     messages.indexOf(message) === messages.length - 1 ? (
@@ -120,7 +139,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                 </div>
               </div>
             </div>
-            
+
             {message.role === "user" && (
               <div className="flex-shrink-0">
                 <div className="w-9 h-9 rounded-lg bg-blue-600 shadow-sm flex items-center justify-center">
