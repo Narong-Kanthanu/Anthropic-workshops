@@ -78,6 +78,82 @@ test("createSession sets secure flag based on NODE_ENV", async () => {
   process.env.NODE_ENV = originalEnv;
 });
 
+test("createSession token includes iat and exp claims", async () => {
+  await createSession("user-123", "test@example.com");
+
+  const token = mockCookieStore.set.mock.calls[0][1];
+  const { payload } = await jwtVerify(token, JWT_SECRET);
+
+  expect(payload.iat).toBeDefined();
+  expect(payload.exp).toBeDefined();
+  expect(typeof payload.iat).toBe("number");
+  expect(typeof payload.exp).toBe("number");
+  expect(payload.exp! - payload.iat!).toBe(7 * 24 * 60 * 60);
+});
+
+test("createSession includes expiresAt in payload", async () => {
+  await createSession("user-123", "test@example.com");
+
+  const token = mockCookieStore.set.mock.calls[0][1];
+  const { payload } = await jwtVerify(token, JWT_SECRET);
+
+  expect(payload.expiresAt).toBeDefined();
+});
+
+test("createSession handles special characters in email", async () => {
+  await createSession("user-123", "test+alias@example.com");
+
+  const token = mockCookieStore.set.mock.calls[0][1];
+  const { payload } = await jwtVerify(token, JWT_SECRET);
+
+  expect(payload.email).toBe("test+alias@example.com");
+});
+
+test("createSession handles UUID-style userId", async () => {
+  const uuid = "550e8400-e29b-41d4-a716-446655440000";
+  await createSession(uuid, "test@example.com");
+
+  const token = mockCookieStore.set.mock.calls[0][1];
+  const { payload } = await jwtVerify(token, JWT_SECRET);
+
+  expect(payload.userId).toBe(uuid);
+});
+
+test("createSession generates different tokens for different users", async () => {
+  await createSession("user-1", "user1@example.com");
+  const token1 = mockCookieStore.set.mock.calls[0][1];
+
+  vi.clearAllMocks();
+
+  await createSession("user-2", "user2@example.com");
+  const token2 = mockCookieStore.set.mock.calls[0][1];
+
+  expect(token1).not.toBe(token2);
+});
+
+test("createSession token can be verified with getSession", async () => {
+  await createSession("user-123", "test@example.com");
+
+  const token = mockCookieStore.set.mock.calls[0][1];
+  mockCookieStore.get.mockReturnValue({ value: token });
+
+  const session = await getSession();
+
+  expect(session).not.toBeNull();
+  expect(session?.userId).toBe("user-123");
+  expect(session?.email).toBe("test@example.com");
+});
+
+test("createSession uses HS256 algorithm", async () => {
+  await createSession("user-123", "test@example.com");
+
+  const token = mockCookieStore.set.mock.calls[0][1];
+  const [headerB64] = token.split(".");
+  const header = JSON.parse(Buffer.from(headerB64, "base64url").toString());
+
+  expect(header.alg).toBe("HS256");
+});
+
 test("getSession returns null when no token exists", async () => {
   mockCookieStore.get.mockReturnValue(undefined);
 

@@ -56,6 +56,11 @@ Schema defined in `prisma/schema.prisma` - reference this file to understand dat
 - JWT sessions (7-day expiry) via `src/lib/auth.ts`
 - Server actions in `src/actions/` for sign-up/sign-in
 
+## Testing
+
+- Vitest config: `vitest.config.mts`
+- Tests use `@vitest-environment node` directive for files needing Node APIs (e.g., jose JWT library)
+
 ## Code Style
 
 - Use comments sparingly. Only comment complex code.
